@@ -7,6 +7,4 @@ jobs:
       - uses: actions/checkout@v2
       - uses: wokwi/wokwi-ci-action@v1
         with:
-          token: ${{ secrets.WOKWI_CI_TOKEN }}
-          - name: Run Wokwi CI
-        run: wokwi-ci
+          token: ${{ secrets.WOKWI_CLI_TOKEN }}
