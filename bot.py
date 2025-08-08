@@ -10,9 +10,39 @@ import requests
 import base64
 import datetime
 import telebot
-
+import json 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+
+# gist
+def create_wokwi_gist(arduino_code, wokwi_json, github_token) :
+    gist_url = "https://api.github.com/gists"
+    headers = {
+        "authorization": f"token {github_token}"
+    }
+
+    payload = {
+        "description": "Wokwi simulation files",
+        "public": True,
+        "files": {
+            "main.ino": {
+                "content": arduino_code
+            },
+            "wokwi.json": {
+                "content": json.dumps(wokwi_json, indent=2)  # Ensure JSON is formatted nicely
+            }
+        }
+    }
+
+    response = requests.post(gist_url, headers=headers, json=payload)
+
+    if response.status_code == 201:
+        gist_id = response.json()["id"]
+        return f"https://gist.github.com/{gist_id}"
+        print("✅ Gist created successfully:", response.json()["html_url"])
+    else:
+        print("❌ Error creating gist:", response.json())
+        return None
 
 # Apply asyncio patch
 nest_asyncio.apply()
