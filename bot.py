@@ -1,3 +1,4 @@
+from email.mime import message
 import os
 import asyncio
 import logging
@@ -5,6 +6,10 @@ import re
 import nest_asyncio
 import aiohttp
 import urllib.parse
+import requests
+import base64
+import datetime
+import telebot
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -16,6 +21,12 @@ nest_asyncio.apply()
 TELEGRAM_BOT_TOKEN = '8267082281:AAFp9JbD36OEAIN7-yJCPSWWpDzEO4-pJmw'
 DEEPSEEK_API_KEY = 'sk-34c1116b28e24ad4add008420062d489'
 
+# github token
+GITHUB_TOKEN = "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"
+GITHUB_USERNAME = "chubbs03"
+REPO_NAME = "wokwi-sim"
+BRANCH = "main"
+
 # === LOGGING ===
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -24,6 +35,36 @@ logging.basicConfig(
 
 # wokwi API
 WOKWI_PROJECT_API = "https://projects.api.wokwi.com/projects"
+
+def upload_file_to_github(path_in_repo, content, commit_message):
+    url = f"https://api.github.com/repos/{GITHUB_USERNAME}/{REPO_NAME}/contents/{path_in_repo}"
+    
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    encoded_content = base64.b64encode(content.encode()).decode()
+
+    r = requests.get(url, headers=headers)
+    sha = r.json()["sha"] if r.status_code == 200 else None
+
+    data = {
+        "message": commit_message,
+        "content": encoded_content,
+        "branch": BRANCH
+    }
+    if sha:
+        data["sha"] = sha
+
+    response = requests.put(url, headers=headers, json=data)
+
+    if response.status_code in [200, 201]:
+        print(f"✅ File {path_in_repo} pushed successfully.")
+        return True
+    else:
+        print("❌ Error:", response.json())
+        return False
 
 # === DeepSeek handler ===
 async def ask_deepseek(message: str, system_prompt: str = "You are an expert Arduino + Wokwi simulator engineer. Generate both the Arduino code and the diagram.json for Wokwi simulation. \
@@ -78,6 +119,15 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         arduino_code = code_match.group(1).strip()
         wokwi_json = json_match.group(1).strip()
+
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        ino_path = f"generated/sketch_{timestamp}.ino"
+        json_path = f"generated/sketch_{timestamp}.wokwi.json"
+
+        upload_file_to_github(ino_path, arduino_code, "Add Arduino code from DeepSeek")
+        upload_file_to_github(json_path, wokwi_json, "Add Wokwi JSON from DeepSeek")
+
+        await update.message.reply_text("✅ Code uploaded to GitHub! Waiting for Wokwi simulation link...")
 
         # Step 3: Clean Arduino code (remove comments and whitespace)
         cleaned_code = "\n".join([line for line in arduino_code.splitlines() if not line.strip().startswith("//")])
